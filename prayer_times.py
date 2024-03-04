@@ -10,6 +10,7 @@ def get_prayer_times(lat, long):
     data = response.json()
     return data
 
+@app.route('/')
 def prayer_times_update():
     # Mississauga latitude and longitude
     lat = 43.5890
@@ -35,7 +36,7 @@ def prayer_times_update():
         f"Midnight: {midnight}\n"
     )
 
-    return render_template('prayer_time.html', prayer_times_info)
+    return render_template('prayer_times.html', prayer_times_info=prayer_times_info)
 
 def get_midnight(Isha, Fajr):
     isha_dt = datetime.strptime(Isha, '%H:%M')
@@ -51,7 +52,6 @@ def convert_to_12hour(time):
     time_24 = datetime.strptime(time, '%H:%M')
     return time_24.strftime('%I:%M %p')
 
-prayer_times_update()
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prayer Times</title>
+</head>
+<body>
+    <h1>Prayer Times in Mississauga</h1>
+    <ul>
+        {% for time, value in prayer_times_info.items() %}
+            <li>{{ time }}: {{ value }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
