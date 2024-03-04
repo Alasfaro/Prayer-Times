@@ -6,10 +6,6 @@
 </head>
 <body>
     <h1>Prayer Times in Mississauga</h1>
-    <ul>
-        {% for time, value in prayer_times_info.items() %}
-            <li>{{ time }}: {{ value }}</li>
-        {% endfor %}
-    </ul>
+    <p>{{ prayer_times_info.replace('\n', '<br>') | safe }}</p>
 </body>
 </html>
