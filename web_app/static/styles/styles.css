@@ -1,0 +1,11 @@
+.head {
+    font-size: 300%;
+    font-family: Verdana;
+}
+.title {
+    border: 15px;
+    border-radius: 5px;
+}
+.time {
+    font-size: 150%;
+}

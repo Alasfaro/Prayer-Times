@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="../static/styles/styles.css">
+    <title>Prayer Times</title>
+</head>
+<body>
+    <div class="title">
+        <h1 class="head">Prayer Times in Mississauga</h1>
+    </div>
+    
+    <div class="body">
+        <p class="time">{{ prayer_times_info.replace('\n', '<br>') | safe }}</p>
+    </div>
+</body>
+</html>
