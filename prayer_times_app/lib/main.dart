@@ -4,55 +4,50 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:geolocator/geolocator.dart'; 
+import 'package:geocoding/geocoding.dart';
 
 void main() {
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Prayer Times',
+      home: PrayerTimes(),
       theme: ThemeData (
-        primarySwatch: Colors.blue,
-        textTheme: GoogleFonts.questrialTextTheme(
-          Theme.of(context).textTheme,
-        ),
+      primarySwatch: Colors.blue,
+      textTheme: GoogleFonts.questrialTextTheme(
+        Theme.of(context).textTheme,
       ),
-      home: Scaffold(
-        backgroundColor: Color.fromRGBO(167, 201, 139, 0.8),
-        appBar: AppBar(
-          centerTitle: true,
-          title: const Text('Prayer Times in Mississauga'),
-          leading: IconButton(
-            onPressed: () {},
-           icon: const FaIcon(FontAwesomeIcons.moon),
-          ),
-          actions: <Widget>[
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.mosque
-              ),
-            )
-          ],
-        ),
-        body: Center(
-          child: Container(
-            height: 350,
-            width: 300,
-            decoration: BoxDecoration(
-              color: Color.fromRGBO(191, 148, 103, 1),
-              borderRadius: BorderRadius.circular(20)
-            ), 
-            child: const PrayerTimes(),
-          ),
-        )
-      ),
-    );
+    ),
+  );}
+}
+
+class LocationService {
+  Future<Position> determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled.');
+    }
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
+    }
+    return await Geolocator.getCurrentPosition();
   }
 }
 
@@ -65,35 +60,63 @@ class PrayerTimes extends StatefulWidget {
 }
 
 class _PrayerTimesState extends State<PrayerTimes> {
-  Future<Map<String, dynamic>>? _prayerTimes;
+  String _cityName = 'Mississauga'; //Default
+  Map<String, dynamic>? _prayerTimes;
 
   @override
   void initState() {
     super.initState();
-    _prayerTimes = fetchPrayerTimes();
+    // _fetchCityAndPrayerTimes();
+    _fetchPrayerData(_cityName);
   }
 
-  Future<Map<String, dynamic>> fetchPrayerTimes() async {
-    final response = await http.get(Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=Mississauga&country=Canada&method=2'));
+//   Future<String> getCityName(Position position) async {
+//   try {
+//     List<Placemark> placemarks = await placemarkFromCoordinates(
+//       position.latitude,
+//       position.longitude,
+//     );
+//     Placemark place = placemarks[0];
+//     return "${place.locality}, ${place.country}";
+//   } catch (e) {
+//     print(e);
+//     return "Unknown Location";
+//   }
+// }
+
+//   void _fetchCityAndPrayerTimes() async {
+//     LocationService().determinePosition().then((position) async {
+//       String cityName = await getCityName(position);
+//       _fetchPrayerData(cityName);
+//     }).catchError((error) {
+//       print(error);
+//       _fetchPrayerData(_cityName); // Default to Mississauga if error
+//     });
+//   }
+
+  Future<void> _fetchPrayerData(String city) async {
+    final response = await http.get(Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=$city&country=Canada&method=2'));
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final timings = data['data']['timings'] as Map<String, dynamic>;
-      Map<String, String> selectTimings = {
-        'Fajr': convertTo12Hour(timings['Fajr']),
-        'Sunrise': convertTo12Hour(timings['Sunrise']),
-        'Dhuhr': convertTo12Hour(timings['Dhuhr']),
-        'Asr': convertTo12Hour(timings['Asr']),
-        'Maghrib': convertTo12Hour(timings['Maghrib']),
-        'Isha': convertTo12Hour(timings['Isha']),
-      };
-      String midnight = getMidnight(timings['Isha'], timings['Fajr']);
-      selectTimings['Midnight'] = convertTo12Hour(midnight);
-      return selectTimings;
+      setState(() {
+        _cityName = city;
+        _prayerTimes = {
+          'Fajr': convertTo12Hour(timings['Fajr']),
+          'Sunrise': convertTo12Hour(timings['Sunrise']),
+          'Dhuhr': convertTo12Hour(timings['Dhuhr']),
+          'Asr': convertTo12Hour(timings['Asr']),
+          'Maghrib': convertTo12Hour(timings['Maghrib']),
+          'Isha': convertTo12Hour(timings['Isha']),
+        };
+        String midnight = getMidnight(timings['Isha'], timings['Fajr']);
+        _prayerTimes?['Midnight'] = convertTo12Hour(midnight);
+      });     
     } else {
       throw Exception('Failed to load prayer times');
     }
   }
-  
+
   String getMidnight(String isha, String fajr) {
     final ishaDt = DateFormat('HH:mm').parse(isha);
     final fajrDt = DateFormat('HH:mm').parse(fajr);
@@ -135,33 +158,95 @@ class _PrayerTimesState extends State<PrayerTimes> {
     );
   }
 
+void _showCityInputDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        TextEditingController textFieldController = TextEditingController();
+        return AlertDialog(
+          title: const Text('Enter Your City'),
+          content: TextField(
+            controller: textFieldController,
+            decoration: const InputDecoration(hintText: "City Name"),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('CANCEL'),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                setState(() {
+                  _cityName = textFieldController.text;
+                });
+                _fetchPrayerData(textFieldController.text);();
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _prayerTimes,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Text("Error: ${snapshot.error}");
-        } else {
-          return ListView(
-            children: snapshot.data!.entries.map((entry) {
+    return Scaffold(
+      backgroundColor: const Color.fromRGBO(167, 201, 139, 0.8),
+      appBar: AppBar(
+        title: Text('Prayer Times in $_cityName'),
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: () {},
+          icon: const FaIcon(FontAwesomeIcons.moon),
+        ),
+        actions: <Widget>[
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(
+              Icons.mosque
+            ),
+          )
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCityInputDialog,
+        tooltip: 'Enter City',
+        backgroundColor: const Color.fromRGBO(191, 148, 103, 1),
+        child: const Icon(
+            Icons.edit_location,
+            color: Color.fromARGB(255, 57, 56, 56),
+          ),
+      ),
+      body: Center(
+        child: Container(
+          height: 350,
+          width: 300,
+          decoration: BoxDecoration(
+            color: const Color.fromRGBO(191, 148, 103, 1),
+            borderRadius: BorderRadius.circular(20)
+          ), 
+          child: _prayerTimes == null ? const CircularProgressIndicator() : ListView(
+            children: _prayerTimes!.entries.map((entry) {
               return ListTile(
                 title: Text(
-                  "${entry.key}: ${entry.value}",
+                  '${entry.key}: ${entry.value}',
                   style: const TextStyle(
-                    fontSize: 20, // Change font size
-                    color: Colors.black, // Change text color
-                    fontWeight: FontWeight.bold, // Make text bold
+                      fontSize: 20, // Change font size
+                      color: Colors.black, // Change text color
+                      fontWeight: FontWeight.bold, // Make text bold
                   ),
                 ),
               );
             }).toList(),
-          );
-        }
-      },
+          ),
+        ),
+      )
     );
   }
+
 }

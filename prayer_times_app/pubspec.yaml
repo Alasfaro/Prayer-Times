@@ -34,6 +34,8 @@ dependencies:
   intl: ^0.17.0
   font_awesome_flutter: ^9.1.0
   google_fonts:
+  geolocator: ^8.0.0
+  geocoding: ^2.0.0
 
 
   # The following adds the Cupertino Icons font to your application.
