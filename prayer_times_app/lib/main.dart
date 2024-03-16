@@ -28,29 +28,6 @@ class MyApp extends StatelessWidget {
   );}
 }
 
-class LocationService {
-  Future<Position> determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
-    }
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
-    }
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.');
-    }
-    return await Geolocator.getCurrentPosition();
-  }
-}
-
 class PrayerTimes extends StatefulWidget {
   const PrayerTimes({super.key});
 
@@ -60,47 +37,39 @@ class PrayerTimes extends StatefulWidget {
 }
 
 class _PrayerTimesState extends State<PrayerTimes> {
-  String _cityName = 'Mississauga'; //Default
+  String? _cityName = 'Your City'; //Default
+    String? _countryName = 'Your Country'; //Default
   Map<String, dynamic>? _prayerTimes;
 
-  @override
-  void initState() {
-    super.initState();
-    // _fetchCityAndPrayerTimes();
-    _fetchPrayerData(_cityName);
+
+  Future<Map<String, String>> getLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    Position position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high
+    );
+    print("Position: ${position.latitude}, ${position.longitude}");
+    List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude, 
+        position.longitude
+    );
+    Placemark place = placemarks[0];
+    String city = place.locality ?? "Your City";
+    String country = place.country ?? "Your Country";
+    return {"city": city, "country": country};
   }
 
-//   Future<String> getCityName(Position position) async {
-//   try {
-//     List<Placemark> placemarks = await placemarkFromCoordinates(
-//       position.latitude,
-//       position.longitude,
-//     );
-//     Placemark place = placemarks[0];
-//     return "${place.locality}, ${place.country}";
-//   } catch (e) {
-//     print(e);
-//     return "Unknown Location";
-//   }
-// }
 
-//   void _fetchCityAndPrayerTimes() async {
-//     LocationService().determinePosition().then((position) async {
-//       String cityName = await getCityName(position);
-//       _fetchPrayerData(cityName);
-//     }).catchError((error) {
-//       print(error);
-//       _fetchPrayerData(_cityName); // Default to Mississauga if error
-//     });
-//   }
-
-  Future<void> _fetchPrayerData(String city) async {
-    final response = await http.get(Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=$city&country=Canada&method=2'));
+  Future<void> getPrayerTime(String city, String country) async {
+    final response = await http.get(Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=$city&country=$country&method=2'));
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final timings = data['data']['timings'] as Map<String, dynamic>;
       setState(() {
         _cityName = city;
+        _countryName = country;
         _prayerTimes = {
           'Fajr': convertTo12Hour(timings['Fajr']),
           'Sunrise': convertTo12Hour(timings['Sunrise']),
@@ -116,6 +85,7 @@ class _PrayerTimesState extends State<PrayerTimes> {
       throw Exception('Failed to load prayer times');
     }
   }
+
 
   String getMidnight(String isha, String fajr) {
     final ishaDt = DateFormat('HH:mm').parse(isha);
@@ -133,57 +103,67 @@ class _PrayerTimesState extends State<PrayerTimes> {
     return DateFormat('h:mm a').format(time24);
   }
 
-  Widget prayerTimeTile(String prayerName, String time, BuildContext context) {
-    var isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
-    return ListTile(
-      leading: Icon(
-        Icons.access_time, // Placeholder icon, change as needed
-        color: isDarkMode ? Colors.white : Colors.black,
-      ),
-      title: Text(
-        prayerName,
-        style: GoogleFonts.questrial(
-          color: isDarkMode ? Colors.white : Colors.black,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      trailing: Text(
-        time,
-        style: GoogleFonts.questrial(
-          color: isDarkMode ? Colors.white70 : Colors.black54,
-          fontSize: 18,
-        ),
-      ),
-    );
+
+  Future<void> _fetchLocationAndPrayerTimes() async {
+    try {
+      final location = await getLocation();
+      if (location["city"] != null && location["country"] != null) {
+        await getPrayerTime(location["city"]!, location["country"]!);
+      } else {
+        print("Location could not be determined.");
+      }
+    } catch (e) {
+      print(e);
+      await getPrayerTime('Mississauga', 'Canada');
+    }
   }
 
-void _showCityInputDialog() {
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocationAndPrayerTimes();
+  }
+
+
+  void _showCityInputDialog() {
+    TextEditingController cityController = TextEditingController();
+    TextEditingController countryController = TextEditingController();
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        TextEditingController textFieldController = TextEditingController();
         return AlertDialog(
-          title: const Text('Enter Your City'),
-          content: TextField(
-            controller: textFieldController,
-            decoration: const InputDecoration(hintText: "City Name"),
+          title: const Text('Enter Location'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: cityController,
+                decoration: const InputDecoration(hintText: "City"),
+              ),
+              TextField(
+                controller: countryController,
+                decoration: const InputDecoration(hintText: "Country"),
+              ),
+            ],
           ),
           actions: <Widget>[
             TextButton(
               child: const Text('CANCEL'),
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.of(context).pop();
               },
             ),
             TextButton(
               child: const Text('OK'),
               onPressed: () {
-                setState(() {
-                  _cityName = textFieldController.text;
-                });
-                _fetchPrayerData(textFieldController.text);();
-                Navigator.pop(context);
+                final String cityInput = cityController.text;
+                final String countryInput = countryController.text;
+                if (cityInput.isNotEmpty && countryInput.isNotEmpty) {
+                  getPrayerTime(cityInput, countryInput);
+                  Navigator.of(context).pop();
+                } else {
+                  print("Please enter both city and country.");
+                }
               },
             ),
           ],
@@ -191,7 +171,6 @@ void _showCityInputDialog() {
       },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -236,9 +215,9 @@ void _showCityInputDialog() {
                 title: Text(
                   '${entry.key}: ${entry.value}',
                   style: const TextStyle(
-                      fontSize: 20, // Change font size
-                      color: Colors.black, // Change text color
-                      fontWeight: FontWeight.bold, // Make text bold
+                      fontSize: 20,
+                      color: Colors.black, 
+                      fontWeight: FontWeight.bold,
                   ),
                 ),
               );
