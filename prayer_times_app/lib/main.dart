@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -6,6 +8,8 @@ import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart'; 
 import 'package:geocoding/geocoding.dart';
+import 'package:lottie/lottie.dart';
+
 
 void main() {
   runApp(MyApp());
@@ -201,30 +205,37 @@ class _PrayerTimesState extends State<PrayerTimes> {
             color: Color.fromARGB(255, 57, 56, 56),
           ),
       ),
-      body: Center(
-        child: Container(
-          height: 350,
-          width: 300,
-          decoration: BoxDecoration(
-            color: const Color.fromRGBO(191, 148, 103, 1),
-            borderRadius: BorderRadius.circular(20)
-          ), 
-          child: _prayerTimes == null ? const CircularProgressIndicator() : ListView(
-            children: _prayerTimes!.entries.map((entry) {
-              return ListTile(
-                title: Text(
-                  '${entry.key}: ${entry.value}',
-                  style: const TextStyle(
-                      fontSize: 20,
-                      color: Colors.black, 
-                      fontWeight: FontWeight.bold,
-                  ),
+      body: Stack(
+          children: [
+            Positioned(
+              child: Lottie.asset('assets/island_anim.json', width: MediaQuery.of(context).size.width), 
+            ),
+            Center(
+              child: Container(
+                height: 350,
+                width: 300,
+                decoration: BoxDecoration(
+                  color: const Color.fromRGBO(191, 148, 103, 1),
+                  borderRadius: BorderRadius.circular(20)
+                ), 
+                child: _prayerTimes == null ? const CircularProgressIndicator() : ListView(
+                  children: _prayerTimes!.entries.map((entry) {
+                    return ListTile(
+                      title: Text(
+                        '${entry.key}: ${entry.value}',
+                        style: const TextStyle(
+                            fontSize: 20,
+                            color: Colors.black, 
+                            fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
-        ),
-      )
+              ),           
+            ),
+          ],
+      ),
     );
   }
 
